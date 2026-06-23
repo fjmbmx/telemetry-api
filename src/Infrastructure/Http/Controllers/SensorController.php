@@ -2,6 +2,7 @@
 
 namespace App\Infrastructure\Http\Controllers;
 
+use App\Application\DeferredTasks;
 use App\Infrastructure\Persistence\SensorDao;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -100,11 +101,15 @@ class SensorController
 
         // Build notifications and check thresholds — only send to queue when alert
         [$notifications, $alertExceeded] = $this->buildNotifications($deviceSensors, $adjusted);
-        if ($alertExceeded) {
-            $this->sendToQueue($notifications, $clientInfo);
-        }
 
-        $this->sendToMqtt($clientCode, $deviceCode, $clientInfo, $deviceSensors, $adjusted);
+        // Las publicaciones a RabbitMQ/MQTT son lentas (red externa). Se difieren para
+        // ejecutarse DESPUES de responder al device (ver fastcgi_finish_request en index.php).
+        DeferredTasks::add(function () use ($alertExceeded, $notifications, $clientInfo, $clientCode, $deviceCode, $deviceSensors, $adjusted) {
+            if ($alertExceeded) {
+                $this->sendToQueue($notifications, $clientInfo);
+            }
+            $this->sendToMqtt($clientCode, $deviceCode, $clientInfo, $deviceSensors, $adjusted);
+        });
 
         return $this->json($response, ['result' => true]);
     }

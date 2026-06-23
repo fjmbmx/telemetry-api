@@ -16,9 +16,15 @@ date_default_timezone_set('America/Mexico_City');
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->safeLoad();
 
-// Build DI container
+// Build DI container (compilado en produccion -> bootstrap mas rapido)
 $builder = new ContainerBuilder();
 $builder->addDefinitions(require __DIR__ . '/../config/dependencies.php');
+if (($_ENV['APP_ENV'] ?? 'production') === 'production') {
+    $cacheDir = __DIR__ . '/../var/cache';
+    if (is_dir($cacheDir) || @mkdir($cacheDir, 0775, true)) {
+        $builder->enableCompilation($cacheDir);
+    }
+}
 $container = $builder->build();
 
 // Create Slim app
@@ -51,3 +57,13 @@ $app->get('/health', function ($request, $response) {
 });
 
 $app->run();
+
+// Enviar la respuesta al cliente YA y cerrar la conexion; lo pesado (MQTT/RabbitMQ)
+// corre en segundo plano sin que el Arduino lo espere.
+if (function_exists('fastcgi_finish_request')) {
+    fastcgi_finish_request();
+} elseif (function_exists('litespeed_finish_request')) {
+    litespeed_finish_request();
+}
+
+\App\Application\DeferredTasks::runAll();

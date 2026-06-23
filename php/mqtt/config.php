@@ -9,4 +9,4 @@ define('MQTT_CLIENT_PREFIX', $_ENV['MQTT_CLIENT_PREFIX'] ?? 'telemetry-api-');
 define('MQTT_TOPIC_PREFIX',  $_ENV['MQTT_TOPIC_PREFIX'] ?? 'telemetry');
 define('MQTT_RETAIN',        filter_var($_ENV['MQTT_RETAIN'] ?? false, FILTER_VALIDATE_BOOLEAN));
 define('MQTT_ENABLED',       filter_var($_ENV['MQTT_ENABLED'] ?? true, FILTER_VALIDATE_BOOLEAN));
-define('MQTT_TIMEOUT',       (int)($_ENV['MQTT_TIMEOUT'] ?? 3));
+define('MQTT_TIMEOUT',       (int)($_ENV['MQTT_TIMEOUT'] ?? 2));
