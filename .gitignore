@@ -1,7 +1,3 @@
 .DS_Store
 .env
 logs/*.log
-
-# Configs con credenciales (subir a mano al server / preservadas en deploy)
-php/rabbitmq/config.php
-php/mqtt/config.php
