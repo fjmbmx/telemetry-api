@@ -20,7 +20,8 @@ $dotenv->safeLoad();
 $builder = new ContainerBuilder();
 $builder->addDefinitions(require __DIR__ . '/../config/dependencies.php');
 if (($_ENV['APP_ENV'] ?? 'production') === 'production') {
-    $cacheDir = __DIR__ . '/../var/cache';
+    // sys_get_temp_dir() es escribible en Hostinger (ahí cachea tambien el SensorDao)
+    $cacheDir = sys_get_temp_dir() . '/telemetry-api-di';
     if ((is_dir($cacheDir) || @mkdir($cacheDir, 0775, true)) && is_writable($cacheDir)) {
         $builder->enableCompilation($cacheDir);
     }

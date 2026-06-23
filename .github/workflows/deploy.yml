@@ -53,8 +53,10 @@ jobs:
           CARPETA: ${{ steps.cfg.outputs.carpeta }}
         run: |
           echo "Subiendo a ${SITE_URL}/receive.php -> public_html/${CARPETA}/ ..."
+          # Solo se preserva el .env; los config.php son versionados (leen del .env)
           curl -fsS --max-time 600 --retry 5 --retry-delay 15 --retry-all-errors \
             -F "token=${DEPLOY_TOKEN}" \
             -F "dir=${CARPETA}" \
+            -F "preserve=.env" \
             -F "file=@deploy.zip" \
             "${SITE_URL}/receive.php"
