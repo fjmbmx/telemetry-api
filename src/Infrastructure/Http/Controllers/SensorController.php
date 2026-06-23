@@ -99,15 +99,10 @@ class SensorController
             'device_code'  => $first['deviceCode']  ?? '',
         ];
 
-        // Build notifications and check thresholds — only send to queue when alert
-        [$notifications, $alertExceeded] = $this->buildNotifications($deviceSensors, $adjusted);
-
-        // Las publicaciones a RabbitMQ/MQTT son lentas (red externa). Se difieren para
-        // ejecutarse DESPUES de responder al device (ver fastcgi_finish_request en index.php).
-        DeferredTasks::add(function () use ($alertExceeded, $notifications, $clientInfo, $clientCode, $deviceCode, $deviceSensors, $adjusted) {
-            if ($alertExceeded) {
-                $this->sendToQueue($notifications, $clientInfo);
-            }
+        // MQTT: publica el reporte completo del dispositivo en segundo plano (diferido
+        // para responder al device de inmediato — ver fastcgi_finish_request en index.php).
+        // Sin alertas por RabbitMQ.
+        DeferredTasks::add(function () use ($clientCode, $deviceCode, $clientInfo, $deviceSensors, $adjusted) {
             $this->sendToMqtt($clientCode, $deviceCode, $clientInfo, $deviceSensors, $adjusted);
         });
 
@@ -219,6 +214,11 @@ class SensorController
         }
     }
 
+    /**
+     * Publica el reporte completo del dispositivo a MQTT, en UN solo mensaje:
+     * topic {MQTT_TOPIC_PREFIX}/{clientCode}/{deviceCode}, payload con
+     * deviceName, deviceModel, timestamp, alert y sensors[] (cada uno con su flag).
+     */
     private function sendToMqtt(
         string $clientCode, string $deviceCode,
         object $clientInfo, array $deviceSensors, array $adjusted
@@ -234,10 +234,10 @@ class SensorController
             if (!file_exists($mqttSender)) return;
             require_once $mqttSender;
 
-            $byCode          = array_column($deviceSensors, null, 'code_sensor');
-            $sensorsWithAlert = [];
-            $alertExceeded   = false;
-
+            // Flag de alerta por sensor segun umbrales (solo informativo en el payload)
+            $byCode        = array_column($deviceSensors, null, 'code_sensor');
+            $sensors       = [];
+            $alertExceeded = false;
             foreach ($adjusted as $sensor) {
                 $ds    = $byCode[$sensor['codSensor']] ?? null;
                 $alert = false;
@@ -250,22 +250,26 @@ class SensorController
                         $alertExceeded = true;
                     }
                 }
-                $sensorsWithAlert[] = [
+                $sensors[] = [
                     'codSensor' => $sensor['codSensor'],
                     'value'     => $sensor['value'],
                     'alert'     => $alert,
                 ];
             }
 
-            $mqtt = new \MqttSender();
-            $mqtt->publishSensorReport(
-                $clientCode,
-                $deviceCode,
-                $clientInfo->device_name,
-                $clientInfo->device_model,
-                $sensorsWithAlert,
-                $alertExceeded
-            );
+            $payload = json_encode([
+                'codeClient'  => $clientCode,
+                'codeDevice'  => $deviceCode,
+                'deviceName'  => $clientInfo->device_name,
+                'deviceModel' => $clientInfo->device_model,
+                'timestamp'   => date('c'),
+                'alert'       => $alertExceeded,
+                'sensors'     => $sensors,
+            ]);
+
+            $topic = MQTT_TOPIC_PREFIX . "/{$clientCode}/{$deviceCode}";
+            $mqtt  = new \MqttSender();
+            $mqtt->publish($topic, $payload, MQTT_RETAIN);
         } catch (\Throwable) {
             // MQTT failure must not block the ingest response
         }
