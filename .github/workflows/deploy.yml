@@ -1,0 +1,60 @@
+name: Deploy telemetry-api a Hostinger
+
+# SOLO manual: la ingesta es la URL viva del firmware, no se redepliega por accidente.
+on:
+  workflow_dispatch:
+    inputs:
+      carpeta:
+        description: 'Carpeta destino en public_html (la del firmware)'
+        type: string
+        required: true
+        default: sensores
+
+concurrency:
+  group: deploy-hostinger-api
+  cancel-in-progress: false
+
+env:
+  SITE_URL: https://tele-metry.net
+
+jobs:
+  deploy:
+    name: Empaquetar y subir por HTTPS (sin FTP)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Definir carpeta destino
+        id: cfg
+        run: |
+          CARPETA="${{ inputs.carpeta }}"
+          [ -z "$CARPETA" ] && CARPETA="sensores"
+          CARPETA="$(echo "$CARPETA" | tr -cd 'A-Za-z0-9_-')"
+          echo "carpeta=$CARPETA" >> "$GITHUB_OUTPUT"
+          echo "Desplegando a public_html/$CARPETA/"
+
+      - name: Crear zip (vendor va commiteado, no se instala nada)
+        run: |
+          zip -r -q -X deploy.zip . \
+            -x '.git/*' \
+            -x '.github/*' \
+            -x '.env' \
+            -x '.env.example' \
+            -x '**/.DS_Store' \
+            -x 'README.md' \
+            -x 'logs/*' \
+            -x 'deploy.zip'
+          echo "Tamano:" && du -h deploy.zip
+
+      - name: Desplegar via HTTPS a receive.php (preserva .env y configs)
+        env:
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          CARPETA: ${{ steps.cfg.outputs.carpeta }}
+        run: |
+          echo "Subiendo a ${SITE_URL}/receive.php -> public_html/${CARPETA}/ ..."
+          curl -fsS --max-time 600 --retry 5 --retry-delay 15 --retry-all-errors \
+            -F "token=${DEPLOY_TOKEN}" \
+            -F "dir=${CARPETA}" \
+            -F "file=@deploy.zip" \
+            "${SITE_URL}/receive.php"
