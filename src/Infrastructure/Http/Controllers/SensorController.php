@@ -99,10 +99,19 @@ class SensorController
             'device_code'  => $first['deviceCode']  ?? '',
         ];
 
-        // MQTT: publica el reporte completo del dispositivo en segundo plano (diferido
-        // para responder al device de inmediato — ver fastcgi_finish_request en index.php).
-        // Sin alertas por RabbitMQ.
-        DeferredTasks::add(function () use ($clientCode, $deviceCode, $clientInfo, $deviceSensors, $adjusted) {
+        // Notificaciones (RabbitMQ) y publicación MQTT corren diferidas en segundo
+        // plano (ver fastcgi_finish_request en index.php), para responder al device
+        // de inmediato. RabbitMQ se mantiene igual que desde el inicio: solo se
+        // encola cuando se excede un umbral (consumidor de WhatsApp ya implementado).
+        [$notifications, $alertExceeded] = $this->buildNotifications($deviceSensors, $adjusted);
+
+        DeferredTasks::add(function () use (
+            $alertExceeded, $notifications, $clientInfo,
+            $clientCode, $deviceCode, $deviceSensors, $adjusted
+        ) {
+            if ($alertExceeded) {
+                $this->sendToQueue($notifications, $clientInfo);
+            }
             $this->sendToMqtt($clientCode, $deviceCode, $clientInfo, $deviceSensors, $adjusted);
         });
 
