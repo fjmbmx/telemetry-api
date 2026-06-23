@@ -4,10 +4,17 @@ API de **ingesta** de telemetría. Es el único servicio que usan los Arduino/ES
 **guardar la información** de los sensores. Está separada del dashboard para que los
 despliegues de consulta **no interrumpan** la recepción de datos.
 
-## Endpoint del firmware (NO cambia)
+## Endpoints
+
+- **Nuevo (este proyecto):** `POST https://tele-metry.net/sensores-api/php/index.php/devices/sensores`
+- **Firmware actual (en producción):** `POST https://tele-metry.net/sensores/php/index.php/devices/sensores`
+
+Se despliega a `public_html/sensores-api/`, así que **convive en paralelo** con la
+ingesta viva en `/sensores/` sin tocarla. El firmware seguirá pegando a `/sensores/`
+hasta que (a) actualices su URL a `/sensores-api/`, o (b) hagas el swap de carpetas.
 
 ```
-POST https://tele-metry.net/sensores/php/index.php/devices/sensores
+POST https://tele-metry.net/sensores-api/php/index.php/devices/sensores
 Content-Type: application/json
 
 {
@@ -53,11 +60,11 @@ servidor (se **preservan** entre despliegues):
 
 ## Despliegue
 
-Manual desde **Actions → Run workflow** (no automático, para no tocar la ingesta viva).
-Sube el zip por **HTTPS** a `receive.php` (Hostinger bloquea FTP desde GitHub) y lo
-extrae en `public_html/sensores/` con backup y preservando los archivos de config.
+Manual desde **Actions → Run workflow** (no automático). Sube el zip por **HTTPS** a
+`receive.php` (Hostinger bloquea FTP desde GitHub) y lo extrae en
+`public_html/sensores-api/` con backup y preservando los archivos de config.
 
 Requiere el secret **`DEPLOY_TOKEN`** (mismo valor que el `receive.php` del servidor).
 
-> Primer despliegue: subir antes `.env` + los `config.php` a `public_html/sensores/`,
+> Primer despliegue: subir antes `.env` + los `config.php` a `public_html/sensores-api/`,
 > o se quedará sin credenciales.

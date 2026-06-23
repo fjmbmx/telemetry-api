@@ -5,10 +5,10 @@ on:
   workflow_dispatch:
     inputs:
       carpeta:
-        description: 'Carpeta destino en public_html (la del firmware)'
+        description: 'Carpeta destino en public_html'
         type: string
         required: true
-        default: sensores
+        default: sensores-api
 
 concurrency:
   group: deploy-hostinger-api
@@ -29,7 +29,7 @@ jobs:
         id: cfg
         run: |
           CARPETA="${{ inputs.carpeta }}"
-          [ -z "$CARPETA" ] && CARPETA="sensores"
+          [ -z "$CARPETA" ] && CARPETA="sensores-api"
           CARPETA="$(echo "$CARPETA" | tr -cd 'A-Za-z0-9_-')"
           echo "carpeta=$CARPETA" >> "$GITHUB_OUTPUT"
           echo "Desplegando a public_html/$CARPETA/"
