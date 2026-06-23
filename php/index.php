@@ -21,7 +21,7 @@ $builder = new ContainerBuilder();
 $builder->addDefinitions(require __DIR__ . '/../config/dependencies.php');
 if (($_ENV['APP_ENV'] ?? 'production') === 'production') {
     $cacheDir = __DIR__ . '/../var/cache';
-    if (is_dir($cacheDir) || @mkdir($cacheDir, 0775, true)) {
+    if ((is_dir($cacheDir) || @mkdir($cacheDir, 0775, true)) && is_writable($cacheDir)) {
         $builder->enableCompilation($cacheDir);
     }
 }
